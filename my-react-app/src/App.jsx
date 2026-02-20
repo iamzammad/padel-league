@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, update, set, get } from "firebase/database";
+import { getDatabase, ref, onValue, update, set, get, push } from "firebase/database";
 
 // ─── FIREBASE CONFIG ───────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -26,7 +26,7 @@ const TEAM_NAMES = [
   "Ahsan/Agha",
   "Talha/Mudassar",
   "Ahsan/Saad",
-  "Umar/+1",
+  "Shoaib/Saad",
   "Saad/Omer",
   "Raamish/Arham",
 ];
@@ -56,35 +56,128 @@ function generateFixtures(teams) {
   rounds.forEach((round, ri) => {
     const week = Math.floor(ri / 3) + 1;
     round.forEach(([home, away]) => {
-      fixtures.push({ id: id++, week, home, away, homeSets: null, awaySets: null, played: false });
+      fixtures.push({ 
+        id: id++, 
+        week, 
+        home, 
+        away, 
+        homeSets: null, 
+        awaySets: null,
+        set1Home: null,
+        set1Away: null,
+        set2Home: null,
+        set2Away: null,
+        set3Home: null,
+        set3Away: null,
+        played: false,
+        matchDate: null,
+        matchTime: null
+      });
     });
   });
   return fixtures;
 }
 
-const SET_OPTIONS = [
-  { home: 3, away: 0 }, { home: 2, away: 1 },
-  { home: 1, away: 2 }, { home: 0, away: 3 },
-];
+// Calculate sets won from individual set scores
+function calculateSetsWon(set1Home, set1Away, set2Home, set2Away, set3Home, set3Away) {
+  let homeSets = 0;
+  let awaySets = 0;
+  
+  if (set1Home !== null && set1Away !== null) {
+    if (set1Home > set1Away) homeSets++;
+    else if (set1Away > set1Home) awaySets++;
+  }
+  if (set2Home !== null && set2Away !== null) {
+    if (set2Home > set2Away) homeSets++;
+    else if (set2Away > set2Home) awaySets++;
+  }
+  if (set3Home !== null && set3Away !== null) {
+    if (set3Home > set3Away) homeSets++;
+    else if (set3Away > set3Home) awaySets++;
+  }
+  
+  return { homeSets, awaySets };
+}
+
+// Calculate total games won/lost from set scores
+function calculateGames(fixture) {
+  let homeGames = 0;
+  let awayGames = 0;
+  
+  if (fixture.set1Home !== null && fixture.set1Away !== null) {
+    homeGames += fixture.set1Home;
+    awayGames += fixture.set1Away;
+  }
+  if (fixture.set2Home !== null && fixture.set2Away !== null) {
+    homeGames += fixture.set2Home;
+    awayGames += fixture.set2Away;
+  }
+  if (fixture.set3Home !== null && fixture.set3Away !== null) {
+    homeGames += fixture.set3Home;
+    awayGames += fixture.set3Away;
+  }
+  
+  return { homeGames, awayGames };
+}
 
 function computeStandings(teams, fixtures) {
   const t = {};
-  teams.forEach(n => { t[n] = { team: n, played: 0, won: 0, lost: 0, setsFor: 0, setsAgainst: 0, points: 0 }; });
+  teams.forEach(n => { 
+    t[n] = { 
+      team: n, 
+      played: 0, 
+      won: 0, 
+      lost: 0, 
+      setsFor: 0, 
+      setsAgainst: 0, 
+      gamesFor: 0,
+      gamesAgainst: 0,
+      points: 0 
+    }; 
+  });
+  
   fixtures.forEach(f => {
     if (!f.played) return;
+    
+    // Calculate sets won from individual set scores
+    const { homeSets, awaySets } = calculateSetsWon(
+      f.set1Home, f.set1Away, 
+      f.set2Home, f.set2Away, 
+      f.set3Home, f.set3Away
+    );
+    
+    // Calculate games won/lost
+    const { homeGames, awayGames } = calculateGames(f);
+    
     const h = t[f.home], a = t[f.away];
     h.played++; a.played++;
-    h.setsFor += f.homeSets; h.setsAgainst += f.awaySets;
-    a.setsFor += f.awaySets; a.setsAgainst += f.homeSets;
-    h.points += f.homeSets; a.points += f.awaySets;
-    if (f.homeSets > f.awaySets) { h.won++; a.lost++; } else { a.won++; h.lost++; }
+    
+    // Sets statistics
+    h.setsFor += homeSets; h.setsAgainst += awaySets;
+    a.setsFor += awaySets; a.setsAgainst += homeSets;
+    
+    // Games statistics (for set difference)
+    h.gamesFor += homeGames; h.gamesAgainst += awayGames;
+    a.gamesFor += awayGames; a.gamesAgainst += homeGames;
+    
+    // Points = sets won (if 3-0, winner gets 3, loser gets 0; if 2-1, winner gets 2, loser gets 1)
+    h.points += homeSets;
+    a.points += awaySets;
+    
+    if (homeSets > awaySets) { 
+      h.won++; 
+      a.lost++; 
+    } else { 
+      a.won++; 
+      h.lost++; 
+    }
   });
+  
   return Object.values(t).sort(
-    (a, b) => b.points - a.points || b.won - a.won || (b.setsFor - b.setsAgainst) - (a.setsFor - a.setsAgainst)
+    (a, b) => b.points - a.points || b.won - a.won || (b.gamesFor - b.gamesAgainst) - (a.gamesFor - a.gamesAgainst)
   );
 }
 
-const WEEKS = [1, 2, 3];
 
 // ─── STYLES ───────────────────────────────────────────────────────────────
 const css = `
@@ -99,6 +192,7 @@ const css = `
   --gold: #ffd166; --silver: #b8c2d4; --bronze: #d4856a;
   --admin: #7c6eff;
 }
+html { background: var(--bg); }
 body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
 body::before {
   content: ''; position: fixed; inset: 0;
@@ -181,11 +275,16 @@ body::before {
 .tab-btn:hover:not(.active) { color: var(--text); background: var(--card2); }
 
 /* ── RANKINGS ── */
-.rank-wrap { background: var(--card); border: 1px solid var(--border2); border-radius: 16px; overflow: hidden; }
-.rank-head { display: grid; grid-template-columns: 52px 1fr 44px 44px 44px 52px 52px 60px 100px 64px; padding: 12px 20px; border-bottom: 1px solid var(--border2); background: var(--surface); }
+.rank-wrap { background: var(--card); border: 1px solid var(--border2); border-radius: 16px; overflow-x: auto; overflow-y: hidden; }
+.rank-head, .rank-row { min-width: fit-content; }
+.rank-head { display: grid; grid-template-columns: 52px 1fr 44px 44px 44px 52px 52px 60px 100px 64px; padding: 12px 20px; border-bottom: 1px solid var(--border2); background: var(--surface); position: relative; }
 .rank-head span { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); font-weight: 600; text-align: center; }
-.rank-head span:nth-child(2) { text-align: left; }
-.rank-row { display: grid; grid-template-columns: 52px 1fr 44px 44px 44px 52px 52px 60px 100px 64px; padding: 13px 20px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.12s; }
+.rank-head span:nth-child(1) { position: sticky; left: 0; z-index: 10; background: var(--surface); padding-right: 12px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); }
+.rank-head span:nth-child(2) { position: sticky; left: 52px; z-index: 10; background: var(--surface); padding-right: 12px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); text-align: left; }
+.rank-row { display: grid; grid-template-columns: 52px 1fr 44px 44px 44px 52px 52px 60px 100px 64px; padding: 13px 20px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.12s; position: relative; }
+.rank-row > *:nth-child(1) { position: sticky; left: 0; z-index: 9; background: var(--card); padding-right: 12px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); }
+.rank-row > *:nth-child(2) { position: sticky; left: 52px; z-index: 9; background: var(--card); padding-right: 12px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); text-align: left; }
+.rank-row:hover > *:nth-child(1), .rank-row:hover > *:nth-child(2) { background: var(--card2); }
 .rank-row:last-child { border-bottom: none; }
 .rank-row:hover { background: var(--card2); }
 .rank-row > * { text-align: center; font-size: 14px; }
@@ -224,12 +323,12 @@ body::before {
 /* ── FIXTURE CARDS ── */
 .fx-grid { display: flex; flex-direction: column; gap: 8px; }
 .fx-card { background: var(--card); border: 1px solid var(--border2); border-radius: 13px; display: grid; grid-template-columns: 1fr 110px 1fr; align-items: stretch; overflow: hidden; transition: border-color 0.15s, transform 0.1s; }
-.fx-card.admin-mode { grid-template-columns: 1fr 110px 1fr 156px; }
+.fx-card.admin-mode { grid-template-columns: 1fr 110px 1fr 180px; }
 .fx-card:hover { border-color: #c8ff0022; }
 .fx-card.fx-played { border-left: 3px solid var(--win); }
 
-.fx-team-col { padding: 16px 18px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
-.fx-team-col.away { align-items: flex-end; }
+.fx-team-col { padding: 16px 18px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; }
+.fx-team-col.away { align-items: center; }
 .fx-team-name { font-weight: 600; font-size: 14px; transition: color 0.15s; }
 .fx-team-name.winner { color: var(--lime); }
 .fx-team-tag { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
@@ -248,6 +347,12 @@ body::before {
 .btn-reset { background: transparent; color: var(--muted); border: 1px solid var(--border2); border-radius: 7px; padding: 5px 0; font-family: 'Barlow', sans-serif; font-size: 11px; cursor: pointer; width: 100%; transition: all 0.13s; }
 .btn-reset:hover { border-color: var(--lose); color: var(--lose); }
 .btn-reset:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-reschedule { background: transparent; color: var(--muted2); border: 1px solid var(--border2); border-radius: 7px; padding: 5px 0; font-family: 'Barlow', sans-serif; font-size: 11px; cursor: pointer; width: 100%; transition: all 0.13s; }
+.btn-reschedule:hover { border-color: var(--warn); color: var(--warn); }
+.btn-reschedule:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-schedule-new { background: var(--admin); color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font-family: 'Barlow Condensed', sans-serif; font-size: 0.9rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background 0.14s; height: 36px; }
+.btn-schedule-new:hover { background: #6557ee; }
+.fx-time-tag { font-size: 9px; letter-spacing: 0.5px; color: var(--muted2); margin-top: 2px; }
 
 /* ── LOGIN MODAL ── */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 16px; animation: mfadein 0.18s ease; }
@@ -293,11 +398,186 @@ body::before {
   .fx-score-box { border-left: none; border-right: none; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 10px; }
   .fx-actions { border-left: none; border-top: 1px solid var(--border); flex-direction: row; align-items: center; flex-wrap: wrap; }
   .btn-score, .btn-reset { flex: 1; }
-  .rank-head, .rank-row { grid-template-columns: 40px 1fr 36px 36px 52px 56px; }
-  .rank-head span:nth-child(5), .rank-head span:nth-child(6), .rank-head span:nth-child(7),
-  .rank-row > *:nth-child(5), .rank-row > *:nth-child(6), .rank-row > *:nth-child(7) { display: none; }
 }
 `;
+
+// ─── SCORE MODAL COMPONENT ────────────────────────────────────────────────
+function ScoreModal({ fixture, onClose, onSave, saving }) {
+  const [set1Home, setSet1Home] = useState(fixture.set1Home?.toString() || "");
+  const [set1Away, setSet1Away] = useState(fixture.set1Away?.toString() || "");
+  const [set2Home, setSet2Home] = useState(fixture.set2Home?.toString() || "");
+  const [set2Away, setSet2Away] = useState(fixture.set2Away?.toString() || "");
+  const [set3Home, setSet3Home] = useState(fixture.set3Home?.toString() || "");
+  const [set3Away, setSet3Away] = useState(fixture.set3Away?.toString() || "");
+
+  const handleSave = () => {
+    const s1h = set1Home !== "" ? parseInt(set1Home) : null;
+    const s1a = set1Away !== "" ? parseInt(set1Away) : null;
+    const s2h = set2Home !== "" ? parseInt(set2Home) : null;
+    const s2a = set2Away !== "" ? parseInt(set2Away) : null;
+    const s3h = set3Home !== "" ? parseInt(set3Home) : null;
+    const s3a = set3Away !== "" ? parseInt(set3Away) : null;
+    
+    onSave(fixture.id, s1h, s1a, s2h, s2a, s3h, s3a);
+  };
+
+  const { homeSets, awaySets } = calculateSetsWon(
+    set1Home !== "" ? parseInt(set1Home) : null,
+    set1Away !== "" ? parseInt(set1Away) : null,
+    set2Home !== "" ? parseInt(set2Home) : null,
+    set2Away !== "" ? parseInt(set2Away) : null,
+    set3Home !== "" ? parseInt(set3Home) : null,
+    set3Away !== "" ? parseInt(set3Away) : null
+  );
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "500px" }}>
+        <div className="score-modal-title">{fixture.played ? "Edit Result" : "Set Result"}</div>
+        <div className="score-modal-sub">Enter all 3 set scores (e.g., 6-0, 6-1, 6-2). All sets are required.</div>
+        <div className="modal-week-tag">📅 Week {fixture.week}</div>
+        {fixture.matchDate && (
+          <div className="modal-week-tag" style={{ marginTop: "8px" }}>
+            📆 {new Date(`${fixture.matchDate}T${fixture.matchTime || "00:00"}`).toLocaleDateString('en-US', { 
+              weekday: 'short', 
+              month: 'short', 
+              day: 'numeric',
+              hour: fixture.matchTime ? 'numeric' : undefined,
+              minute: fixture.matchTime ? '2-digit' : undefined,
+              hour12: true
+            })}
+          </div>
+        )}
+        <div className="modal-matchup">
+          <span className="modal-team">{fixture.home}</span>
+          <span className="modal-vs">VS</span>
+          <span className="modal-team">{fixture.away}</span>
+        </div>
+
+        {/* Set Score Inputs */}
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
+            <label style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Set 1</label>
+            <div></div>
+            <div></div>
+            <input
+              type="number"
+              min="0"
+              max="7"
+              className="pw-input"
+              value={set1Home}
+              onChange={e => setSet1Home(e.target.value)}
+              placeholder="0"
+              style={{ textAlign: "center" }}
+            />
+            <span style={{ textAlign: "center", color: "var(--muted)" }}>–</span>
+            <input
+              type="number"
+              min="0"
+              max="7"
+              className="pw-input"
+              value={set1Away}
+              onChange={e => setSet1Away(e.target.value)}
+              placeholder="0"
+              style={{ textAlign: "center" }}
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
+            <label style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Set 2</label>
+            <div></div>
+            <div></div>
+            <input
+              type="number"
+              min="0"
+              max="7"
+              className="pw-input"
+              value={set2Home}
+              onChange={e => setSet2Home(e.target.value)}
+              placeholder="0"
+              style={{ textAlign: "center" }}
+            />
+            <span style={{ textAlign: "center", color: "var(--muted)" }}>–</span>
+            <input
+              type="number"
+              min="0"
+              max="7"
+              className="pw-input"
+              value={set2Away}
+              onChange={e => setSet2Away(e.target.value)}
+              placeholder="0"
+              style={{ textAlign: "center" }}
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
+            <label style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Set 3 *</label>
+            <div></div>
+            <div></div>
+            <input
+              type="number"
+              min="0"
+              max="7"
+              className="pw-input"
+              value={set3Home}
+              onChange={e => setSet3Home(e.target.value)}
+              placeholder="0"
+              style={{ textAlign: "center" }}
+              required
+            />
+            <span style={{ textAlign: "center", color: "var(--muted)" }}>–</span>
+            <input
+              type="number"
+              min="0"
+              max="7"
+              className="pw-input"
+              value={set3Away}
+              onChange={e => setSet3Away(e.target.value)}
+              placeholder="0"
+              style={{ textAlign: "center" }}
+              required
+            />
+          </div>
+        </div>
+
+        {/* Match Summary */}
+        {(set1Home !== "" || set1Away !== "" || set2Home !== "" || set2Away !== "" || set3Home !== "" || set3Away !== "") && (
+          <div style={{ 
+            textAlign: "center", 
+            padding: "12px", 
+            background: "var(--surface)", 
+            borderRadius: "8px", 
+            marginBottom: "16px",
+            fontSize: "13px"
+          }}>
+            <div style={{ color: "var(--muted2)", marginBottom: "4px" }}>Match Score</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: "700", color: "var(--lime)" }}>
+              {homeSets} – {awaySets}
+            </div>
+            {set1Home !== "" && set1Away !== "" && set2Home !== "" && set2Away !== "" && set3Home !== "" && set3Away !== "" ? (
+              <div style={{ fontSize: "11px", color: "var(--win)", marginTop: "4px" }}>
+                ✓ All 3 sets completed
+              </div>
+            ) : (
+              <div style={{ fontSize: "11px", color: "var(--warn)", marginTop: "4px" }}>
+                All 3 sets must be completed
+              </div>
+            )}
+          </div>
+        )}
+
+        <button 
+          className="btn-login" 
+          onClick={handleSave}
+          disabled={saving || set1Home === "" || set1Away === "" || set2Home === "" || set2Away === "" || set3Home === "" || set3Away === ""}
+        >
+          {saving ? "Saving…" : "Save Score"}
+        </button>
+        <button className="btn-cancel" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  );
+}
 
 // ─── APP ──────────────────────────────────────────────────────────────────
 export default function App() {
@@ -305,7 +585,6 @@ export default function App() {
   const [loading, setLoading]         = useState(true);
   const [syncStatus, setSyncStatus]   = useState("offline"); // "connected" | "syncing" | "error" | "offline"
   const [tab, setTab]                 = useState("rankings");
-  const [weekFilter, setWeekFilter]   = useState("All");
   const [teamFilter, setTeamFilter]   = useState("All");
   const [isAdmin, setIsAdmin]         = useState(false);
   const [savingId, setSavingId]       = useState(null); // fixture id currently being saved
@@ -320,6 +599,14 @@ export default function App() {
 
   // Score modal state
   const [scoreModal, setScoreModal]   = useState(null);
+  
+  // Schedule/Reschedule modal state
+  const [scheduleModal, setScheduleModal] = useState(null); // null | "new" | fixtureId for reschedule
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleHome, setScheduleHome] = useState("");
+  const [scheduleAway, setScheduleAway] = useState("");
+  const [sortBy] = useState("date"); // Always sort by date
 
   // ── FIREBASE: bootstrap fixtures + real-time listener ──────────────────
   useEffect(() => {
@@ -348,7 +635,40 @@ export default function App() {
         if (snapshot.exists()) {
           const data = snapshot.val();
           // Firebase returns an object keyed by fixture id — convert back to sorted array
-          const arr = Object.values(data).sort((a, b) => a.id - b.id);
+          // Ensure backward compatibility by adding default fields if missing
+          const arr = Object.values(data).map(f => {
+            const fixture = {
+              ...f,
+              matchDate: f.matchDate || null,
+              matchTime: f.matchTime || null,
+              set1Home: f.set1Home !== undefined ? f.set1Home : null,
+              set1Away: f.set1Away !== undefined ? f.set1Away : null,
+              set2Home: f.set2Home !== undefined ? f.set2Home : null,
+              set2Away: f.set2Away !== undefined ? f.set2Away : null,
+              set3Home: f.set3Home !== undefined ? f.set3Home : null,
+              set3Away: f.set3Away !== undefined ? f.set3Away : null
+            };
+            
+            // If old format (only homeSets/awaySets), calculate from sets if available
+            if (f.played && f.homeSets !== null && f.awaySets !== null) {
+              // If sets are not stored, keep the old format
+              if (fixture.set1Home === null && fixture.set2Home === null && fixture.set3Home === null) {
+                // Old format - sets won are already in homeSets/awaySets
+                // This is fine, we'll use them as-is
+              } else {
+                // Recalculate sets won from individual set scores
+                const { homeSets, awaySets } = calculateSetsWon(
+                  fixture.set1Home, fixture.set1Away,
+                  fixture.set2Home, fixture.set2Away,
+                  fixture.set3Home, fixture.set3Away
+                );
+                fixture.homeSets = homeSets;
+                fixture.awaySets = awaySets;
+              }
+            }
+            
+            return fixture;
+          }).sort((a, b) => a.id - b.id);
           setFixtures(arr);
         } else {
           // Fallback: use generated fixtures if DB is somehow empty
@@ -375,26 +695,54 @@ export default function App() {
     const form = {};
     TEAM_NAMES.forEach(t => { form[t] = []; });
     fixtures.filter(f => f.played).sort((a, b) => a.id - b.id).forEach(f => {
-      const hw = f.homeSets > f.awaySets;
+      // Calculate sets won from individual set scores
+      const { homeSets, awaySets } = calculateSetsWon(
+        f.set1Home, f.set1Away,
+        f.set2Home, f.set2Away,
+        f.set3Home, f.set3Away
+      );
+      const hw = homeSets > awaySets;
       form[f.home].push(hw ? "w" : "l");
       form[f.away].push(hw ? "l" : "w");
     });
     return form;
   }, [fixtures]);
 
-  const filtered = useMemo(() => fixtures.filter(f => {
-    const wOk = weekFilter === "All" || f.week === Number(weekFilter);
-    const tOk = teamFilter === "All" || f.home === teamFilter || f.away === teamFilter;
-    return wOk && tOk;
-  }), [fixtures, weekFilter, teamFilter]);
+  const filtered = useMemo(() => {
+    let filtered = fixtures.filter(f => {
+      const tOk = teamFilter === "All" || f.home === teamFilter || f.away === teamFilter;
+      return tOk;
+    });
+    
+    // Sort by date
+    filtered = filtered.sort((a, b) => {
+      if (!a.matchDate && !b.matchDate) return a.id - b.id;
+      if (!a.matchDate) return 1;
+      if (!b.matchDate) return -1;
+      const dateA = new Date(`${a.matchDate}T${a.matchTime || "00:00"}`);
+      const dateB = new Date(`${b.matchDate}T${b.matchTime || "00:00"}`);
+      return dateA - dateB;
+    });
+    
+    return filtered;
+  }, [fixtures, teamFilter, sortBy]);
 
-  const byWeek = useMemo(() => {
+  // Group by date for date view
+  const byDate = useMemo(() => {
     const map = {};
-    filtered.forEach(f => { if (!map[f.week]) map[f.week] = []; map[f.week].push(f); });
+    filtered.forEach(f => {
+      const dateKey = f.matchDate || "Unscheduled";
+      if (!map[dateKey]) map[dateKey] = [];
+      map[dateKey].push(f);
+    });
     return map;
   }, [filtered]);
 
-  const weeksToShow = Object.keys(byWeek).map(Number).sort();
+  const datesToShow = Object.keys(byDate).sort((a, b) => {
+    if (a === "Unscheduled") return 1;
+    if (b === "Unscheduled") return -1;
+    return new Date(a) - new Date(b);
+  });
   const totalPlayed = fixtures.filter(f => f.played).length;
   const totalLeft   = fixtures.length - totalPlayed;
 
@@ -419,14 +767,38 @@ export default function App() {
   const logout = () => { setIsAdmin(false); setScoreModal(null); };
 
   // ── SCORE ACTIONS — write directly to Firebase ─────────────────────────
-  const applyScore = async (fId, h, a) => {
+  const applyScore = async (fId, set1Home, set1Away, set2Home, set2Away, set3Home, set3Away) => {
     if (!isAdmin) return;
+    
+    // Validate that all 3 sets are completed
+    if (set1Home === null || set1Away === null || 
+        set2Home === null || set2Away === null || 
+        set3Home === null || set3Away === null) {
+      alert("All 3 sets must be completed");
+      return;
+    }
+    
+    // Calculate sets won
+    const { homeSets, awaySets } = calculateSetsWon(set1Home, set1Away, set2Home, set2Away, set3Home, set3Away);
+    
+    // Validate that match is complete (one team must win 2 sets)
+    if (homeSets < 2 && awaySets < 2) {
+      alert("Match must be completed - one team must win at least 2 sets");
+      return;
+    }
+    
     setSavingId(fId);
     setSyncStatus("syncing");
     try {
       await update(ref(db, `fixtures/${fId}`), {
-        homeSets: h,
-        awaySets: a,
+        set1Home,
+        set1Away,
+        set2Home,
+        set2Away,
+        set3Home,
+        set3Away,
+        homeSets,
+        awaySets,
         played: true,
       });
       setSyncStatus("connected");
@@ -445,6 +817,12 @@ export default function App() {
     setSyncStatus("syncing");
     try {
       await update(ref(db, `fixtures/${fId}`), {
+        set1Home: null,
+        set1Away: null,
+        set2Home: null,
+        set2Away: null,
+        set3Home: null,
+        set3Away: null,
         homeSets: null,
         awaySets: null,
         played: false,
@@ -455,6 +833,105 @@ export default function App() {
       setSyncStatus("error");
     } finally {
       setSavingId(null);
+    }
+  };
+
+  // ── SCHEDULE/RESCHEDULE ACTIONS ───────────────────────────────────────────
+  const openScheduleModal = (fixtureId = null) => {
+    if (fixtureId) {
+      // Reschedule existing match
+      const fx = fixtures.find(f => f.id === fixtureId);
+      if (fx) {
+        setScheduleModal(fixtureId);
+        setScheduleDate(fx.matchDate || "");
+        setScheduleTime(fx.matchTime || "");
+        setScheduleHome(fx.home);
+        setScheduleAway(fx.away);
+      }
+    } else {
+      // Schedule new match
+      setScheduleModal("new");
+      const today = new Date().toISOString().split('T')[0];
+      setScheduleDate(today);
+      setScheduleTime("18:00");
+      setScheduleHome("");
+      setScheduleAway("");
+    }
+  };
+
+  const closeScheduleModal = () => {
+    setScheduleModal(null);
+    setScheduleDate("");
+    setScheduleTime("");
+    setScheduleHome("");
+    setScheduleAway("");
+  };
+
+  const saveSchedule = async () => {
+    if (!isAdmin) return;
+    
+    if (scheduleModal === "new") {
+      // Create new match
+      if (!scheduleHome || !scheduleAway || scheduleHome === scheduleAway) {
+        alert("Please select two different teams");
+        return;
+      }
+      if (!scheduleDate || !scheduleTime) {
+        alert("Please select date and time");
+        return;
+      }
+      
+      setSyncStatus("syncing");
+      try {
+        // Get next available ID
+        const snapshot = await get(FIXTURES_REF);
+        let maxId = 0;
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          maxId = Math.max(...Object.values(data).map(f => f.id || 0));
+        }
+        
+        const newFixture = {
+          id: maxId + 1,
+          week: 1, // Default week, can be calculated based on date if needed
+          home: scheduleHome,
+          away: scheduleAway,
+          homeSets: null,
+          awaySets: null,
+          played: false,
+          matchDate: scheduleDate,
+          matchTime: scheduleTime
+        };
+        
+        await set(ref(db, `fixtures/${newFixture.id}`), newFixture);
+        setSyncStatus("connected");
+        closeScheduleModal();
+      } catch (err) {
+        console.error("Failed to create fixture:", err);
+        setSyncStatus("error");
+      }
+    } else {
+      // Reschedule existing match
+      if (!scheduleDate || !scheduleTime) {
+        alert("Please select date and time");
+        return;
+      }
+      
+      setSavingId(scheduleModal);
+      setSyncStatus("syncing");
+      try {
+        await update(ref(db, `fixtures/${scheduleModal}`), {
+          matchDate: scheduleDate,
+          matchTime: scheduleTime
+        });
+        setSyncStatus("connected");
+        closeScheduleModal();
+      } catch (err) {
+        console.error("Failed to reschedule fixture:", err);
+        setSyncStatus("error");
+      } finally {
+        setSavingId(null);
+      }
     }
   };
 
@@ -511,14 +988,13 @@ export default function App() {
             <div className="logo-box">🎾</div>
             <div>
               <div className="league-title">APTL x Padium League</div>
-              <div className="league-sub">Season 2025 · {TEAM_NAMES.length} teams · 3 weeks · 3 matches/team/week</div>
+              <div className="league-sub">Ramadan 2026 · 10 teams</div>
             </div>
           </div>
           <div className="header-stats">
             <div className="hstat"><div className="hstat-val">{fixtures.length}</div><div className="hstat-lbl">Fixtures</div></div>
             <div className="hstat"><div className="hstat-val">{totalPlayed}</div><div className="hstat-lbl">Played</div></div>
             <div className="hstat"><div className="hstat-val">{totalLeft}</div><div className="hstat-lbl">Left</div></div>
-            <div className="hstat"><div className="hstat-val">3</div><div className="hstat-lbl">Weeks</div></div>
           </div>
         </div>
 
@@ -532,11 +1008,10 @@ export default function App() {
         {tab === "rankings" && (
           <div className="rank-wrap">
             <div className="rank-head">
-              <span>#</span><span>Team</span><span>P</span><span>W</span><span>L</span>
-              <span>SF</span><span>SA</span><span>+/−</span><span>Form</span><span>PTS</span>
+              <span>#</span><span>Team</span><span>P</span><span>W</span><span>L</span><span>SF</span><span>SA</span><span>GD</span><span>Form</span><span>PTS</span>
             </div>
             {standings.map((row, i) => {
-              const diff = row.setsFor - row.setsAgainst;
+              const diff = row.gamesFor - row.gamesAgainst; // Set difference = games won - games lost
               const form = teamForm[row.team] || [];
               return (
                 <div className="rank-row" key={row.team}>
@@ -570,62 +1045,77 @@ export default function App() {
           <>
             <div className="filter-row">
               <div className="filter-group">
-                <span className="filter-lbl">Week</span>
-                <div className="week-pills">
-                  <button className={`week-pill ${weekFilter === "All" ? "wp-active" : ""}`} onClick={() => setWeekFilter("All")}>All</button>
-                  {WEEKS.map(w => (
-                    <button key={w} className={`week-pill ${weekFilter === w ? "wp-active" : ""}`} onClick={() => setWeekFilter(w)}>Wk {w}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="filter-divider" />
-              <div className="filter-group">
                 <span className="filter-lbl">Team</span>
                 <select className="team-sel" value={teamFilter} onChange={e => setTeamFilter(e.target.value)}>
                   <option value="All">All Teams</option>
                   {TEAM_NAMES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
+              {isAdmin && (
+                <>
+                  <div className="filter-divider" />
+                  <button className="btn-schedule-new" onClick={() => openScheduleModal()}>
+                    + Schedule Match
+                  </button>
+                </>
+              )}
               <span className="results-count">{filtered.length} match{filtered.length !== 1 ? "es" : ""}</span>
             </div>
 
-            {weeksToShow.length === 0 ? (
+            {datesToShow.length === 0 ? (
               <div className="empty"><div className="empty-icon">🔍</div><p>No matches found for this filter.</p></div>
             ) : (
-              weeksToShow.map(week => {
-                const wfx = byWeek[week];
-                const wPlayed = wfx.filter(f => f.played).length;
+              datesToShow.map(dateKey => {
+                const dateFx = byDate[dateKey];
+                const datePlayed = dateFx.filter(f => f.played).length;
+                const dateObj = dateKey !== "Unscheduled" ? new Date(dateKey) : null;
+                const dateLabel = dateKey === "Unscheduled" 
+                  ? "Unscheduled" 
+                  : dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                
                 return (
-                  <div className="week-section" key={week}>
+                  <div className="week-section" key={dateKey}>
                     <div className="week-header">
-                      <div className="wk-label">Week <span className="wk-accent">{week}</span></div>
+                      <div className="wk-label">{dateLabel}</div>
                       <div className="wk-line" />
-                      <div className="wk-badge">{wPlayed}/{wfx.length} played</div>
+                      <div className="wk-badge">{datePlayed}/{dateFx.length} played</div>
                     </div>
                     <div className="fx-grid">
-                      {wfx.map(f => {
+                      {dateFx.map(f => {
                         const homeWin = f.played && f.homeSets > f.awaySets;
                         const awayWin = f.played && f.awaySets > f.homeSets;
                         const isSaving = savingId === f.id;
                         return (
                           <div key={f.id} className={`fx-card ${isAdmin ? "admin-mode" : ""} ${f.played ? "fx-played" : ""}`}>
-                            {/* Home team */}
+                            {/* Team 1 */}
                             <div className="fx-team-col">
                               <span className={`fx-team-name ${homeWin ? "winner" : ""}`}>{f.home}</span>
-                              <span className="fx-team-tag">Home</span>
                             </div>
 
                             {/* Score */}
                             <div className="fx-score-box">
-                              {f.played
-                                ? <div className="fx-score-val">{f.homeSets}–{f.awaySets}</div>
-                                : <div className="fx-score-vs">{isSaving ? "…" : "VS"}</div>}
+                              {f.played ? (
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                                  <div className="fx-score-val">{f.homeSets}–{f.awaySets}</div>
+                                  {(f.set1Home !== null || f.set2Home !== null || f.set3Home !== null) && (
+                                    <div style={{ fontSize: "11px", color: "var(--muted2)", letterSpacing: "1px" }}>
+                                      {f.set1Home !== null && f.set1Away !== null && `${f.set1Home}-${f.set1Away}`}
+                                      {f.set2Home !== null && f.set2Away !== null && ` ${f.set2Home}-${f.set2Away}`}
+                                      {f.set3Home !== null && f.set3Away !== null && ` ${f.set3Home}-${f.set3Away}`}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                                  {f.matchTime && <span className="fx-time-tag" style={{ fontSize: "10px", marginBottom: "2px" }}>{f.matchTime}</span>}
+                                  <div className="fx-score-vs">{isSaving ? "…" : "VS"}</div>
+                                </div>
+                              )}
                             </div>
 
-                            {/* Away team */}
+                            {/* Team 2 */}
                             <div className="fx-team-col away">
                               <span className={`fx-team-name ${awayWin ? "winner" : ""}`}>{f.away}</span>
-                              <span className="fx-team-tag">Away</span>
                             </div>
 
                             {/* Admin actions */}
@@ -639,7 +1129,14 @@ export default function App() {
                                   onClick={() => setScoreModal(f.id)}
                                   disabled={isSaving}
                                 >
-                                  {f.played ? "Edit" : "Set Score"}
+                                  {f.played ? "Edit Score" : "Set Score"}
+                                </button>
+                                <button
+                                  className="btn-reschedule"
+                                  onClick={() => openScheduleModal(f.id)}
+                                  disabled={isSaving}
+                                >
+                                  {f.matchDate ? "Reschedule" : "Schedule"}
                                 </button>
                                 {f.played && (
                                   <button
@@ -705,29 +1202,78 @@ export default function App() {
       )}
 
       {/* ── SCORE MODAL (admin only) ── */}
-      {modalFx && isAdmin && (
-        <div className="modal-overlay" onClick={() => setScoreModal(null)}>
+      {modalFx && isAdmin && <ScoreModal 
+        fixture={modalFx}
+        onClose={() => setScoreModal(null)}
+        onSave={applyScore}
+        saving={savingId === modalFx.id}
+      />}
+
+      {/* ── SCHEDULE/RESCHEDULE MODAL (admin only) ── */}
+      {scheduleModal && isAdmin && (
+        <div className="modal-overlay" onClick={closeScheduleModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="score-modal-title">Set Result</div>
-            <div className="score-modal-sub">Choose the match score — best of 3 sets</div>
-            <div className="modal-week-tag">📅 Week {modalFx.week}</div>
-            <div className="modal-matchup">
-              <span className="modal-team">{modalFx.home}</span>
-              <span className="modal-vs">VS</span>
-              <span className="modal-team">{modalFx.away}</span>
+            <div className="score-modal-title">
+              {scheduleModal === "new" ? "Schedule New Match" : "Reschedule Match"}
             </div>
-            <div className="score-opts">
-              {SET_OPTIONS.map(opt => {
-                const winner = opt.home > opt.away ? modalFx.home : modalFx.away;
-                return (
-                  <div key={`${opt.home}-${opt.away}`} className="score-opt" onClick={() => applyScore(modalFx.id, opt.home, opt.away)}>
-                    <div className="so-score">{opt.home} – {opt.away}</div>
-                    <div className="so-winner">{winner} wins</div>
-                  </div>
-                );
-              })}
+            <div className="score-modal-sub">
+              {scheduleModal === "new" 
+                ? "Select teams, date, and time for the match" 
+                : "Update the date and time for this match"}
             </div>
-            <button className="btn-cancel" onClick={() => setScoreModal(null)}>Cancel</button>
+            
+            {scheduleModal === "new" && (
+              <>
+                <label className="pw-label">Team 1</label>
+                <select 
+                  className="team-sel" 
+                  value={scheduleHome} 
+                  onChange={e => setScheduleHome(e.target.value)}
+                  style={{ width: "100%", marginBottom: "16px" }}
+                >
+                  <option value="">Select team</option>
+                  {TEAM_NAMES.filter(t => t !== scheduleAway).map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                
+                <label className="pw-label">Team 2</label>
+                <select 
+                  className="team-sel" 
+                  value={scheduleAway} 
+                  onChange={e => setScheduleAway(e.target.value)}
+                  style={{ width: "100%", marginBottom: "16px" }}
+                >
+                  <option value="">Select team</option>
+                  {TEAM_NAMES.filter(t => t !== scheduleHome).map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </>
+            )}
+            
+            <label className="pw-label">Match Date</label>
+            <input
+              type="date"
+              className="pw-input"
+              value={scheduleDate}
+              onChange={e => setScheduleDate(e.target.value)}
+              style={{ marginBottom: "16px" }}
+            />
+            
+            <label className="pw-label">Match Time</label>
+            <input
+              type="time"
+              className="pw-input"
+              value={scheduleTime}
+              onChange={e => setScheduleTime(e.target.value)}
+              style={{ marginBottom: "20px" }}
+            />
+            
+            <button className="btn-login" onClick={saveSchedule}>
+              {scheduleModal === "new" ? "Schedule Match" : "Update Schedule"}
+            </button>
+            <button className="btn-cancel" onClick={closeScheduleModal}>Cancel</button>
           </div>
         </div>
       )}
