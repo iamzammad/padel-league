@@ -278,25 +278,27 @@ body::before {
 
 /* ── RANKINGS ── */
 .rank-wrap { background: var(--card); border: 1px solid var(--border2); border-radius: 12px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
-.rank-head, .rank-row { min-width: 320px; }
-.rank-head { display: grid; grid-template-columns: 28px 1fr 28px 28px 28px 40px 38px; padding: 8px 6px; border-bottom: 1px solid var(--border2); background: var(--surface); position: relative; }
+.rank-head, .rank-row { min-width: fit-content; }
+.rank-head { display: grid; grid-template-columns: 28px 100px 28px 28px 28px 40px 44px 38px; padding: 8px 6px; border-bottom: 1px solid var(--border2); background: var(--surface); position: relative; }
 .rank-head span { font-size: 7px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); font-weight: 600; text-align: center; }
 .rank-head span:nth-child(1) { position: sticky; left: 0; z-index: 10; background: var(--surface); padding-right: 4px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); }
-.rank-head span:nth-child(2) { position: sticky; left: 28px; z-index: 10; background: var(--surface); padding-right: 4px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); text-align: left; }
-.rank-row { display: grid; grid-template-columns: 28px 1fr 28px 28px 28px 40px 38px; padding: 9px 6px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.12s; position: relative; }
+.rank-head span:nth-child(2) { position: sticky; left: 28px; z-index: 10; background: var(--surface); padding-right: 4px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); text-align: center; }
+.rank-row { display: grid; grid-template-columns: 28px 100px 28px 28px 28px 40px 44px 38px; padding: 9px 6px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.12s; position: relative; }
 .rank-row > *:nth-child(1) { position: sticky; left: 0; z-index: 9; background: var(--card); padding-right: 4px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); }
-.rank-row > *:nth-child(2) { position: sticky; left: 28px; z-index: 9; background: var(--card); padding-right: 4px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); text-align: left; }
+.rank-row > *:nth-child(2) { position: sticky; left: 28px; z-index: 9; background: var(--card); padding-right: 4px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); text-align: center; }
 .rank-row:active > *:nth-child(1), .rank-row:active > *:nth-child(2) { background: var(--card2); }
 .rank-row:last-child { border-bottom: none; }
 .rank-row:active { background: var(--card2); }
 .rank-row > * { text-align: center; font-size: 10px; }
-.rank-row > *:nth-child(2) { text-align: left; }
 .rank-num { width: 22px; height: 22px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-family: 'Barlow Condensed', sans-serif; font-size: 0.8rem; font-weight: 800; }
 .rn-1 { background: var(--gold); color: #07090f; } .rn-2 { background: var(--silver); color: #07090f; } .rn-3 { background: var(--bronze); color: #fff; } .rn-n { background: var(--border2); color: var(--muted2); }
 .r-team { font-weight: 600; font-size: 10px; }
 .r-win { color: var(--win); font-weight: 600; } .r-lose { color: var(--lose); font-weight: 600; }
 .r-diff.pos { color: var(--win); } .r-diff.neg { color: var(--lose); }
 .r-pts { font-family: 'Barlow Condensed', sans-serif; font-size: 1.1rem; font-weight: 800; color: var(--lime); line-height: 1; }
+.form-track { display: flex; gap: 1.5px; align-items: center; justify-content: center; }
+.form-dot { width: 5px; height: 5px; border-radius: 50%; }
+.fd-w { background: var(--win); } .fd-l { background: var(--lose); } .fd-e { background: var(--border2); }
 
 /* ── SCHEDULE FILTERS ── */
 .filter-row { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; padding: 14px; background: var(--card); border: 1px solid var(--border2); border-radius: 12px; }
@@ -677,6 +679,23 @@ export default function App() {
 
   const standings = useMemo(() => computeStandings(TEAM_NAMES, fixtures), [fixtures]);
 
+  const teamForm = useMemo(() => {
+    const form = {};
+    TEAM_NAMES.forEach(t => { form[t] = []; });
+    fixtures.filter(f => f.played).sort((a, b) => a.id - b.id).forEach(f => {
+      // Calculate sets won from individual set scores
+      const { homeSets, awaySets } = calculateSetsWon(
+        f.set1Home, f.set1Away,
+        f.set2Home, f.set2Away,
+        f.set3Home, f.set3Away
+      );
+      const hw = homeSets > awaySets;
+      form[f.home].push(hw ? "w" : "l");
+      form[f.away].push(hw ? "l" : "w");
+    });
+    return form;
+  }, [fixtures]);
+
   const filtered = useMemo(() => {
     let filtered = fixtures.filter(f => {
       const tOk = teamFilter === "All" || f.home === teamFilter || f.away === teamFilter;
@@ -977,10 +996,11 @@ export default function App() {
         {tab === "rankings" && (
           <div className="rank-wrap">
             <div className="rank-head">
-              <span>#</span><span>Team</span><span>P</span><span>W</span><span>L</span><span>GD</span><span>PTS</span>
+              <span>#</span><span>Team</span><span>P</span><span>W</span><span>L</span><span>GD</span><span>Form</span><span>PTS</span>
             </div>
             {standings.map((row, i) => {
               const diff = row.gamesFor - row.gamesAgainst; // Set difference = games won - games lost
+              const form = teamForm[row.team] || [];
               return (
                 <div className="rank-row" key={row.team}>
                   <div style={{display:"flex",justifyContent:"center"}}>
@@ -991,6 +1011,14 @@ export default function App() {
                   <div className="r-win">{row.won}</div>
                   <div className="r-lose">{row.lost}</div>
                   <div className={`r-diff ${diff > 0 ? "pos" : diff < 0 ? "neg" : ""}`}>{diff > 0 ? "+" : ""}{diff}</div>
+                  <div className="form-track">
+                    {Array.from({length:3}).map((_, k) => {
+                      const last3 = form.slice(-3);
+                      const offset = 3 - last3.length;
+                      const res = k < offset ? null : last3[k - offset];
+                      return <div key={k} className={`form-dot ${res === "w" ? "fd-w" : res === "l" ? "fd-l" : "fd-e"}`} />;
+                    })}
+                  </div>
                   <div className="r-pts">{row.points}</div>
                 </div>
               );
