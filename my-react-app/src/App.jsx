@@ -22,7 +22,7 @@ const TEAM_NAMES = [
   "Sherry/Hassan",
   "Usman/Ibrahim",
   "Sharjeel/Bilal",
-  "Zammad/Asadullah",
+  "Zammad/Asad",
   "Ahsan/Agha",
   "Talha/Mudassar",
   "Ahsan/Saad",
@@ -201,7 +201,7 @@ body::before {
 }
 .wrap { position: relative; z-index: 1; width: 100%; max-width: 100%; margin: 0 auto; padding: 12px 12px 80px; box-sizing: border-box; }
 .tab-content { width: 100%; box-sizing: border-box; }
-.tab-content.schedule-content { padding-left: 15px; padding-right: 7px; box-sizing: border-box; width: 100%; max-width: 100%; }
+.tab-content.schedule-content { padding-left: 5px; padding-right: 5px; box-sizing: border-box; width: 100%; max-width: 100%; }
 .tab-content.schedule-content > * { width: 100%; max-width: 100%; box-sizing: border-box; }
 .tab-content.schedule-content > * > * { width: 100%; max-width: 100%; box-sizing: border-box; }
 
@@ -328,18 +328,18 @@ body::before {
 .wk-badge { font-size: 10px; color: var(--muted2); background: var(--card); border: 1px solid var(--border2); border-radius: 6px; padding: 4px 10px; font-weight: 600; flex-shrink: 0; }
 
 /* ── FIXTURE CARDS ── */
-.fx-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 100%; box-sizing: border-box; }
-.fx-card { background: var(--card); border: 1px solid var(--border2); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; transition: border-color 0.15s; width: 100%; max-width: 100%; box-sizing: border-box; flex-shrink: 0; }
+.fx-grid { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 100%; box-sizing: border-box; }
+.fx-card { background: var(--card); border: 1px solid var(--border2); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; transition: border-color 0.15s; width: 100%; max-width: 100%; box-sizing: border-box; flex-shrink: 0; }
 .fx-card.fx-played { border-left: 3px solid var(--win); }
 .fx-card-main { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; width: 100%; box-sizing: border-box; }
-.fx-team-col { padding: 14px 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; }
+.fx-team-col { padding: 18px 16px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; }
 .fx-team-col.away { align-items: center; }
-.fx-team-name { font-weight: 600; font-size: 13px; transition: color 0.15s; text-align: center; word-break: break-word; }
+.fx-team-name { font-weight: 600; font-size: 15px; transition: color 0.15s; text-align: center; word-break: break-word; }
 .fx-team-name.winner { color: var(--lime); }
-.fx-team-tag { font-size: 9px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); }
-.fx-score-box { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; padding: 12px 8px; min-height: 60px; }
-.fx-score-val { font-family: 'Barlow Condensed', sans-serif; font-size: 1.8rem; font-weight: 900; letter-spacing: 2px; color: var(--lime); line-height: 1; }
-.fx-score-vs { font-family: 'Barlow Condensed', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--muted); letter-spacing: 1.5px; }
+.fx-team-tag { font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); }
+.fx-score-box { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; padding: 16px 10px; min-height: 75px; }
+.fx-score-val { font-family: 'Barlow Condensed', sans-serif; font-size: 2.2rem; font-weight: 900; letter-spacing: 2px; color: var(--lime); line-height: 1; }
+.fx-score-vs { font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 700; color: var(--muted); letter-spacing: 1.5px; }
 .fx-actions { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-top: 1px solid var(--border); background: #0b0d16; }
 .status-pill { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; font-weight: 700; padding: 4px 10px; border-radius: 20px; width: fit-content; margin: 0 auto 4px; }
 .sp-played { background: #22d98a22; color: var(--win); } .sp-pending { background: var(--border); color: var(--muted); }
