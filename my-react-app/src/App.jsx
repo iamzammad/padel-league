@@ -199,7 +199,9 @@ body::before {
   background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
   background-size: 32px 32px; opacity: 0.15; pointer-events: none; z-index: 0;
 }
-.wrap { position: relative; z-index: 1; width: 100%; margin: 0 auto; padding: 12px 12px 80px; }
+.wrap { position: relative; z-index: 1; width: 100%; max-width: 100%; margin: 0 auto; padding: 12px 12px 80px; box-sizing: border-box; }
+.tab-content { width: 100%; }
+.tab-content.schedule-content { padding-left: 15px; padding-right: 7px; margin-left: -5px; margin-right: -5px; width: calc(100% + 10px); }
 
 /* ── SYNC STATUS ── */
 .sync-bar {
@@ -303,20 +305,20 @@ body::before {
 .fd-w { background: var(--win); } .fd-l { background: var(--lose); } .fd-e { background: var(--border2); }
 
 /* ── SCHEDULE FILTERS ── */
-.filter-row { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; padding: 14px; background: var(--card); border: 1px solid var(--border2); border-radius: 12px; }
-.filter-group { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.filter-row { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; padding: 14px; background: var(--card); border: 1px solid var(--border2); border-radius: 12px; width: 100%; box-sizing: border-box; }
+.filter-group { display: flex; flex-direction: column; gap: 6px; width: 100%; flex-shrink: 0; }
 .filter-lbl { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); font-weight: 700; }
 .week-pills { display: flex; gap: 6px; flex-wrap: wrap; }
 .week-pill { font-family: 'Barlow Condensed', sans-serif; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.8px; padding: 8px 14px; border-radius: 8px; border: 1.5px solid var(--border2); background: var(--surface); color: var(--muted2); cursor: pointer; transition: all 0.14s; text-transform: uppercase; touch-action: manipulation; min-height: 36px; }
 .week-pill:active:not(.wp-active) { border-color: var(--lime); color: var(--lime); }
 .week-pill.wp-active { background: var(--lime); border-color: var(--lime); color: #07090f; }
-.team-sel { background: var(--surface); color: var(--text); border: 1.5px solid var(--border2); border-radius: 8px; padding: 10px 14px; font-family: 'Barlow', sans-serif; font-size: 14px; cursor: pointer; outline: none; width: 100%; min-height: 44px; touch-action: manipulation; }
+.team-sel { background: var(--surface); color: var(--text); border: 1.5px solid var(--border2); border-radius: 8px; padding: 10px 14px; font-family: 'Barlow', sans-serif; font-size: 14px; cursor: pointer; outline: none; width: 100%; min-height: 44px; touch-action: manipulation; box-sizing: border-box; }
 .team-sel:focus { border-color: var(--lime); }
 .filter-divider { display: none; }
-.results-count { font-size: 11px; color: var(--muted); text-align: center; padding-top: 4px; }
+.results-count { font-size: 11px; color: var(--muted); text-align: center; padding-top: 4px; width: 100%; flex-shrink: 0; }
 
 /* ── WEEK SECTIONS ── */
-.week-section { margin-bottom: 24px; }
+.week-section { margin-bottom: 24px; width: 100%; }
 .week-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .wk-label { font-family: 'Barlow Condensed', sans-serif; font-size: 1.2rem; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
 .wk-accent { color: var(--lime); }
@@ -324,8 +326,8 @@ body::before {
 .wk-badge { font-size: 10px; color: var(--muted2); background: var(--card); border: 1px solid var(--border2); border-radius: 6px; padding: 4px 10px; font-weight: 600; }
 
 /* ── FIXTURE CARDS ── */
-.fx-grid { display: flex; flex-direction: column; gap: 10px; }
-.fx-card { background: var(--card); border: 1px solid var(--border2); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; transition: border-color 0.15s; }
+.fx-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.fx-card { background: var(--card); border: 1px solid var(--border2); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; transition: border-color 0.15s; width: 100%; box-sizing: border-box; }
 .fx-card.fx-played { border-left: 3px solid var(--win); }
 .fx-card-main { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; }
 .fx-team-col { padding: 14px 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; }
@@ -389,6 +391,49 @@ body::before {
 
 .empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
 .empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+/* ── IPHONE 19.5:9 ASPECT RATIO OPTIMIZATIONS ── */
+@media (min-aspect-ratio: 19/9) and (max-aspect-ratio: 20/9) and (max-width: 430px) {
+  .wrap { padding: 10px 10px 70px; }
+  .header { padding: 6px 0 16px; margin-bottom: 16px; gap: 12px; }
+  .logo-box { width: 44px; height: 44px; font-size: 22px; }
+  .league-title { font-size: 1.4rem; letter-spacing: 1.2px; }
+  .league-sub { font-size: 9px; }
+  .header-stats { gap: 6px; }
+  .hstat { padding: 8px 10px; }
+  .hstat-val { font-size: 1.2rem; }
+  .hstat-lbl { font-size: 8px; }
+  .tabs { margin-bottom: 16px; padding: 3px; }
+  .tab-btn { padding: 9px 14px; font-size: 0.85rem; min-height: 42px; }
+  .rank-head { padding: 7px 5px; }
+  .rank-row { padding: 8px 5px; }
+  .rank-head span { font-size: 8px; }
+  .rank-row > * { font-size: 11px; }
+  .rank-row > *:nth-child(8) { font-size: 1rem; }
+  .r-team { font-size: 11px; }
+  .r-pts { font-size: 1rem; }
+  .filter-row { padding: 12px; margin-bottom: 16px; gap: 10px; }
+  .week-section { margin-bottom: 20px; }
+  .week-header { margin-bottom: 10px; gap: 8px; }
+  .wk-label { font-size: 1.1rem; }
+  .fx-card-main { min-height: auto; }
+  .fx-team-col { padding: 12px 10px; }
+  .fx-team-name { font-size: 12px; }
+  .fx-score-box { padding: 10px 6px; min-height: 56px; }
+  .fx-score-val { font-size: 1.6rem; }
+  .fx-score-vs { font-size: 1rem; }
+  .fx-actions { padding: 10px; gap: 6px; }
+  .btn-score { padding: 11px 0; font-size: 0.85rem; min-height: 42px; }
+  .btn-reset, .btn-reschedule { padding: 9px 0; min-height: 38px; }
+  .modal { padding: 20px; border-radius: 16px; }
+  .modal-title { font-size: 1.3rem; }
+  .modal-sub { font-size: 11px; margin-bottom: 18px; }
+  .pw-input { padding: 12px 44px 12px 12px; min-height: 44px; }
+  .btn-login { padding: 12px; min-height: 44px; }
+  .btn-cancel { padding: 10px; min-height: 42px; }
+  .admin-bar { padding: 6px 0 10px; }
+  .sync-bar { padding: 3px 0 6px; }
+}
 `;
 
 // ─── SCORE MODAL COMPONENT ────────────────────────────────────────────────
@@ -996,7 +1041,8 @@ export default function App() {
 
         {/* ── RANKINGS ── */}
         {tab === "rankings" && (
-          <div className="rank-wrap">
+          <div className="tab-content">
+            <div className="rank-wrap">
             <div className="rank-head">
               <span>#</span><span>Team</span><span>P</span><span>W</span><span>L</span><span>GD</span><span>Form</span><span>PTS</span>
             </div>
@@ -1025,12 +1071,14 @@ export default function App() {
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 
         {/* ── SCHEDULE ── */}
         {tab === "schedule" && (
-          <>
+          <div className="tab-content schedule-content">
+            <>
             <div className="filter-row">
               <div className="filter-group">
                 <span className="filter-lbl">Team</span>
@@ -1147,7 +1195,8 @@ export default function App() {
                 );
               })
             )}
-          </>
+            </>
+          </div>
         )}
       </div>
 
