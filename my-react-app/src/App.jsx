@@ -746,8 +746,24 @@ export default function App() {
   }, [fixtures]);
 
   const filtered = useMemo(() => {
+    // Debug: Log all unique team names in fixtures when filtering for Shoaib/Saad
+    if (teamFilter === "Shoaib/Saad" && fixtures.length > 0) {
+      const allTeamNames = new Set();
+      fixtures.forEach(f => {
+        if (f.home) allTeamNames.add(f.home);
+        if (f.away) allTeamNames.add(f.away);
+      });
+      console.log("All team names in fixtures:", Array.from(allTeamNames).sort());
+      console.log("Looking for:", teamFilter);
+    }
+    
     let filtered = fixtures.filter(f => {
-      const tOk = teamFilter === "All" || f.home === teamFilter || f.away === teamFilter;
+      if (teamFilter === "All") return true;
+      // Normalize team names for comparison (trim whitespace)
+      const normalizedFilter = teamFilter.trim();
+      const normalizedHome = (f.home || "").trim();
+      const normalizedAway = (f.away || "").trim();
+      const tOk = normalizedHome === normalizedFilter || normalizedAway === normalizedFilter;
       return tOk;
     });
     
