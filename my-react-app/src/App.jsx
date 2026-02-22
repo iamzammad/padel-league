@@ -280,7 +280,7 @@ body::before {
 .rank-wrap { background: var(--card); border: 1px solid var(--border2); border-radius: 12px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
 .rank-head, .rank-row { min-width: fit-content; }
 .rank-head { display: grid; grid-template-columns: 30px 105px 30px 30px 30px 42px 46px 40px; padding: 8px 6px; border-bottom: 1px solid var(--border2); background: var(--surface); position: relative; }
-.rank-head span { font-size: 7px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); font-weight: 600; text-align: center; }
+.rank-head span { font-size: 9px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); font-weight: 600; text-align: center; }
 .rank-head span:nth-child(1) { position: sticky; left: 0; z-index: 10; background: var(--surface); padding-right: 4px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); }
 .rank-head span:nth-child(2) { position: sticky; left: 30px; z-index: 10; background: var(--surface); padding-right: 4px; box-shadow: 2px 0 4px rgba(0,0,0,0.1); text-align: center; }
 .rank-row { display: grid; grid-template-columns: 30px 105px 30px 30px 30px 42px 46px 40px; padding: 9px 6px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.12s; position: relative; }
