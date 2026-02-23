@@ -26,7 +26,7 @@ const TEAM_NAMES = [
   "Ahsan/Agha",
   "Talha/Mudassar",
   "Ahsan/Saad",
-  "Shoaib/Saad",
+  "Osama/Mubashar",
   "Saad/Omer",
   "Raamish/Arham",
 ];
