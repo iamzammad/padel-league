@@ -745,30 +745,19 @@ export default function App() {
     return form;
   }, [fixtures]);
 
-  const filtered = useMemo(() => {
-    // Debug: Log all unique team names in fixtures when filtering for Shoaib/Saad
-    if (teamFilter === "Shoaib/Saad" && fixtures.length > 0) {
-      const allTeamNames = new Set();
-      fixtures.forEach(f => {
-        if (f.home) allTeamNames.add(f.home);
-        if (f.away) allTeamNames.add(f.away);
-      });
-      console.log("All team names in fixtures:", Array.from(allTeamNames).sort());
-      console.log("Looking for:", teamFilter);
-    }
-    
-    let filtered = fixtures.filter(f => {
-      if (teamFilter === "All") return true;
-      // Normalize team names for comparison (trim whitespace)
-      const normalizedFilter = teamFilter.trim();
-      const normalizedHome = (f.home || "").trim();
-      const normalizedAway = (f.away || "").trim();
-      const tOk = normalizedHome === normalizedFilter || normalizedAway === normalizedFilter;
-      return tOk;
-    });
-    
-    // Sort by date
-    filtered = filtered.sort((a, b) => {
+  const normalizeTeam = (name) => (name || "").trim();
+  const matchesTeamFilter = (f) => {
+    if (teamFilter === "All") return true;
+    const nf = normalizeTeam(teamFilter);
+    return normalizeTeam(f.home) === nf || normalizeTeam(f.away) === nf;
+  };
+
+  // Upcoming fixtures (Schedule tab default)
+  const upcoming = useMemo(() => {
+    let out = fixtures.filter(f => !f.played && matchesTeamFilter(f));
+
+    // Sort by date (ascending), unscheduled last
+    out = out.sort((a, b) => {
       if (!a.matchDate && !b.matchDate) return a.id - b.id;
       if (!a.matchDate) return 1;
       if (!b.matchDate) return -1;
@@ -776,25 +765,55 @@ export default function App() {
       const dateB = new Date(`${b.matchDate}T${b.matchTime || "00:00"}`);
       return dateA - dateB;
     });
-    
-    return filtered;
+    return out;
   }, [fixtures, teamFilter, sortBy]);
 
-  // Group by date for date view
-  const byDate = useMemo(() => {
+  // Played fixtures (Results tab + optional Schedule toggle)
+  const results = useMemo(() => {
+    let out = fixtures.filter(f => f.played && matchesTeamFilter(f));
+
+    // Sort by date (descending), no-date last
+    out = out.sort((a, b) => {
+      if (!a.matchDate && !b.matchDate) return b.id - a.id;
+      if (!a.matchDate) return 1;
+      if (!b.matchDate) return -1;
+      const dateA = new Date(`${a.matchDate}T${a.matchTime || "00:00"}`);
+      const dateB = new Date(`${b.matchDate}T${b.matchTime || "00:00"}`);
+      return dateB - dateA;
+    });
+    return out;
+  }, [fixtures, teamFilter, sortBy]);
+
+  const byDateUpcoming = useMemo(() => {
     const map = {};
-    filtered.forEach(f => {
+    upcoming.forEach(f => {
       const dateKey = f.matchDate || "Unscheduled";
       if (!map[dateKey]) map[dateKey] = [];
       map[dateKey].push(f);
     });
     return map;
-  }, [filtered]);
+  }, [upcoming]);
 
-  const datesToShow = Object.keys(byDate).sort((a, b) => {
+  const datesToShowUpcoming = Object.keys(byDateUpcoming).sort((a, b) => {
     if (a === "Unscheduled") return 1;
     if (b === "Unscheduled") return -1;
     return new Date(a) - new Date(b);
+  });
+
+  const byDateResults = useMemo(() => {
+    const map = {};
+    results.forEach(f => {
+      const dateKey = f.matchDate || "No Date";
+      if (!map[dateKey]) map[dateKey] = [];
+      map[dateKey].push(f);
+    });
+    return map;
+  }, [results]);
+
+  const datesToShowResults = Object.keys(byDateResults).sort((a, b) => {
+    if (a === "No Date") return 1;
+    if (b === "No Date") return -1;
+    return new Date(b) - new Date(a);
   });
   const totalPlayed = fixtures.filter(f => f.played).length;
   const totalLeft   = fixtures.length - totalPlayed;
@@ -1055,6 +1074,7 @@ export default function App() {
         <div className="tabs">
           <button className={`tab-btn ${tab === "rankings" ? "active" : ""}`} onClick={() => setTab("rankings")}>Rankings</button>
           <button className={`tab-btn ${tab === "schedule" ? "active" : ""}`} onClick={() => setTab("schedule")}>Schedule</button>
+          <button className={`tab-btn ${tab === "results" ? "active" : ""}`} onClick={() => setTab("results")}>Results</button>
         </div>
 
         {/* ── RANKINGS ── */}
@@ -1113,15 +1133,16 @@ export default function App() {
                   </button>
                 </>
               )}
-              <span className="results-count">{filtered.length} match{filtered.length !== 1 ? "es" : ""}</span>
+              <span className="results-count">
+                {upcoming.length} upcoming
+              </span>
             </div>
 
-            {datesToShow.length === 0 ? (
-              <div className="empty"><div className="empty-icon">🔍</div><p>No matches found for this filter.</p></div>
+            {datesToShowUpcoming.length === 0 ? (
+              <div className="empty"><div className="empty-icon">🔍</div><p>No upcoming matches found for this filter.</p></div>
             ) : (
-              datesToShow.map(dateKey => {
-                const dateFx = byDate[dateKey];
-                const datePlayed = dateFx.filter(f => f.played).length;
+              datesToShowUpcoming.map(dateKey => {
+                const dateFx = byDateUpcoming[dateKey];
                 const dateObj = dateKey !== "Unscheduled" ? new Date(dateKey) : null;
                 const dateLabel = dateKey === "Unscheduled" 
                   ? "Unscheduled" 
@@ -1132,7 +1153,7 @@ export default function App() {
                     <div className="week-header">
                       <div className="wk-label">{dateLabel}</div>
                       <div className="wk-line" />
-                      <div className="wk-badge">{datePlayed}/{dateFx.length} played</div>
+                      <div className="wk-badge">{dateFx.length} upcoming</div>
                     </div>
                     <div className="fx-grid">
                       {dateFx.map(f => {
@@ -1213,6 +1234,109 @@ export default function App() {
                 );
               })
             )}
+
+            </>
+          </div>
+        )}
+
+        {/* ── RESULTS ── */}
+        {tab === "results" && (
+          <div className="tab-content schedule-content">
+            <>
+              <div className="filter-row">
+                <div className="filter-group">
+                  <span className="filter-lbl">Team</span>
+                  <select className="team-sel" value={teamFilter} onChange={e => setTeamFilter(e.target.value)}>
+                    <option value="All">All Teams</option>
+                    {TEAM_NAMES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <span className="results-count">{results.length} result{results.length !== 1 ? "s" : ""}</span>
+              </div>
+
+              {datesToShowResults.length === 0 ? (
+                <div className="empty"><div className="empty-icon">🏆</div><p>No completed matches found for this filter.</p></div>
+              ) : (
+                datesToShowResults.map(dateKey => {
+                  const dateFx = byDateResults[dateKey];
+                  const dateObj = dateKey !== "No Date" ? new Date(dateKey) : null;
+                  const dateLabel = dateKey === "No Date"
+                    ? "No Date"
+                    : dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+                  return (
+                    <div className="week-section" key={`tabres-${dateKey}`}>
+                      <div className="week-header">
+                        <div className="wk-label">{dateLabel}</div>
+                        <div className="wk-line" />
+                        <div className="wk-badge">{dateFx.length} played</div>
+                      </div>
+                      <div className="fx-grid">
+                        {dateFx.map(f => {
+                          const homeWin = f.played && f.homeSets > f.awaySets;
+                          const awayWin = f.played && f.awaySets > f.homeSets;
+                          const isSaving = savingId === f.id;
+                          return (
+                            <div key={`tabres-${f.id}`} className={`fx-card ${f.played ? "fx-played" : ""}`}>
+                              <div className="fx-card-main">
+                                <div className="fx-team-col">
+                                  <span className={`fx-team-name ${homeWin ? "winner" : ""}`}>{f.home}</span>
+                                </div>
+                                <div className="fx-score-box">
+                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                                    <div className="fx-score-val">{f.homeSets}–{f.awaySets}</div>
+                                    {(f.set1Home !== null || f.set2Home !== null || f.set3Home !== null) && (
+                                      <div style={{ fontSize: "10px", color: "var(--muted2)", letterSpacing: "0.8px" }}>
+                                        {f.set1Home !== null && f.set1Away !== null && `${f.set1Home}-${f.set1Away}`}
+                                        {f.set2Home !== null && f.set2Away !== null && ` ${f.set2Home}-${f.set2Away}`}
+                                        {f.set3Home !== null && f.set3Away !== null && ` ${f.set3Home}-${f.set3Away}`}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="fx-team-col away">
+                                  <span className={`fx-team-name ${awayWin ? "winner" : ""}`}>{f.away}</span>
+                                </div>
+                              </div>
+
+                              {isAdmin && (
+                                <div className="fx-actions">
+                                  <span className={`status-pill ${f.played ? "sp-played" : "sp-pending"}`}>
+                                    {isSaving ? "Saving…" : f.played ? "Final" : "Pending"}
+                                  </span>
+                                  <button
+                                    className="btn-score"
+                                    onClick={() => setScoreModal(f.id)}
+                                    disabled={isSaving}
+                                  >
+                                    {f.played ? "Edit Score" : "Set Score"}
+                                  </button>
+                                  <button
+                                    className="btn-reschedule"
+                                    onClick={() => openScheduleModal(f.id)}
+                                    disabled={isSaving}
+                                  >
+                                    {f.matchDate ? "Reschedule" : "Schedule"}
+                                  </button>
+                                  {f.played && (
+                                    <button
+                                      className="btn-reset"
+                                      onClick={() => resetFx(f.id)}
+                                      disabled={isSaving}
+                                    >
+                                      {isSaving ? "…" : "Reset"}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </>
           </div>
         )}
